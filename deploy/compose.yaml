@@ -1,0 +1,21 @@
+services:
+  spark-tts:
+    build: .
+    image: spark-tts:latest
+    volumes:
+      - .:/app
+    container_name: spark-tts
+    environment:
+      - LC_ALL=zh_CN.UTF-8
+      - TZ=Asia/Shanghai  
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: [ "0" ]
+              capabilities: [gpu]
+    ports:
+      - 7862:7860
+    tty: true
+    stdin_open: true

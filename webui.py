@@ -183,8 +183,12 @@ def build_ui(model_dir, device=0):
                     outputs=[audio_output],
                 )
 
+                from sparktts.utils.funasr import auto_asr
+                prompt_wav_upload.change(auto_asr, prompt_wav_upload, prompt_text_input)
+                prompt_wav_record.change(auto_asr, prompt_wav_record, prompt_text_input)
+
             # Voice Creation Tab
-            with gr.TabItem("Voice Creation"):
+            with gr.TabItem("Voice Creation"): 
                 gr.Markdown(
                     "### Create your own voice based on the following parameters"
                 )

@@ -1,0 +1,51 @@
+---
+- name: 部署Spark-TTS到ttd-stage环境
+  hosts: ttd-stage
+  become: true
+  vars:
+    project_dir: /opt/spark-tts
+
+  tasks:
+    - name: 创建项目目录
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: 使用rsync同步项目文件
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ project_dir }}"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=node_modules"
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+        delete: yes
+
+    - name: 复制Docker Compose配置
+      copy:
+        src: "{{ project_dir }}/deploy/compose.yaml"
+        dest: "{{ project_dir }}/compose.yaml"
+        remote_src: yes
+    
+    - name: 复制Docker Buildfile
+      copy:
+        src: "{{ project_dir }}/deploy/Dockerfile"
+        dest: "{{ project_dir }}/Dockerfile"
+        remote_src: yes     
+
+    - name: 构建并启动Docker容器
+      command: docker compose up -d --build
+      args:
+        chdir: "{{ project_dir }}"
+
+    - name: 检查容器状态
+      command: docker compose ps
+      args:
+        chdir: "{{ project_dir }}"
+      register: container_status
+
+    - name: 显示容器状态
+      debug:
+        var: container_status.stdout_lines
