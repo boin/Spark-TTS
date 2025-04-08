@@ -1,0 +1,32 @@
+services:
+  spark-api:
+    build:
+      context: ../../
+      dockerfile: runtime/fastapi/Dockerfile
+    container_name: spark-api
+    image: spark-tts:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_DIR=/app/pretrained_models/Spark-TTS-0.5B
+      - DEVICE=0
+      - TZ=Asia/Shanghai
+    volumes:
+      - type: volume # data_root
+        source: TTD-Data
+        target: /app/pretrained_models
+        volume:
+          nocopy: true
+          subpath: spark-tts/pretrained_models
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: all
+
+volumes:
+  TTD-Data:
+    external: true

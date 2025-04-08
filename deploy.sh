@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Spark-TTS 部署脚本
-# 用法: ./deploy.sh [环境名称]
+# 用法: ./deploy.sh [部署类型]
+# 部署类型: stage (Gradio应用) 或 api (API服务器)
 
-# 默认值
-ENV=${1:-"stage"}
+DEPLOY_TYPE=${1}
 
 # 颜色定义
 GREEN='\033[0;32m'
@@ -33,26 +33,33 @@ if [ ! -f "$INVENTORY_FILE" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}开始部署 Spark-TTS 到 $ENV 环境${NC}"
+# 根据部署类型设置目标主机和标签
+case "$DEPLOY_TYPE" in
+    "stage")
+        TARGET_HOST="ttd-stage"
+        TAGS="stage"
+        echo -e "${GREEN}开始部署 Spark-TTS Gradio 应用到 $TARGET_HOST${NC}"
+        ;;
+    "api")
+        TARGET_HOST="ttd-edge"
+        TAGS="api"
+        echo -e "${GREEN}开始部署 Spark-TTS API 服务器到 $TARGET_HOST${NC}"
+        ;;
+    *)
+        echo -e "${RED}错误: 无效的部署类型 '$DEPLOY_TYPE'。请使用 'stage' 或 'api'${NC}"
+        exit 1
+        ;;
+esac
 
 # 执行ansible playbook
-ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $ENV -v
+echo -e "${YELLOW}执行命令: ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v${NC}"
+ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v
 
 # 检查部署结果
 DEPLOY_RESULT=$?
-
-# 显示部署结果
 if [ $DEPLOY_RESULT -eq 0 ]; then
-    echo -e "${GREEN}"
-    echo "====================================="
-    echo "     部署成功完成!"
-    echo "====================================="
-    echo -e "${NC}"
+    echo -e "${GREEN}部署成功!${NC}"
 else
-    echo -e "${RED}"
-    echo "====================================="
-    echo "     部署失败，请检查日志"
-    echo "====================================="
-    echo -e "${NC}"
-    exit 1
+    echo -e "${RED}部署失败，返回代码: $DEPLOY_RESULT${NC}"
+    exit $DEPLOY_RESULT
 fi

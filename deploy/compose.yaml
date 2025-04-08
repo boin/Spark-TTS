@@ -13,7 +13,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "0" ]
+              device_ids: [ "1" ]
               capabilities: [gpu]
     ports:
       - 7862:7860

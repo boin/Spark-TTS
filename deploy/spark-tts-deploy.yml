@@ -1,9 +1,10 @@
 ---
-- name: 部署Spark-TTS到ttd-stage环境
+- name: 部署Spark-TTS Gradio应用到ttd-stage环境
   hosts: ttd-stage
   become: true
   vars:
     project_dir: /opt/spark-tts
+  tags: ["stage"]
 
   tasks:
     - name: 创建项目目录
@@ -18,9 +19,14 @@
         dest: "{{ project_dir }}"
         rsync_opts:
           - "--exclude=.git"
+          - "--exclude=.conda"
+          - "--exclude=pretrained_models"
+          - "--exclude=example"
           - "--exclude=node_modules"
           - "--exclude=__pycache__"
           - "--exclude=*.pyc"
+          - "--exclude=runtime"
+          - "--exclude=src"
         delete: yes
 
     - name: 复制Docker Compose配置
@@ -35,7 +41,7 @@
         dest: "{{ project_dir }}/Dockerfile"
         remote_src: yes     
 
-    - name: 构建并启动Docker容器
+    - name: 构建并启动Gradio应用容器
       command: docker compose up -d --build
       args:
         chdir: "{{ project_dir }}"
@@ -49,3 +55,55 @@
     - name: 显示容器状态
       debug:
         var: container_status.stdout_lines
+
+- name: 部署Spark-TTS API服务器到ttd-edge环境
+  hosts: ttd-edge
+  become: true
+  vars:
+    project_dir: /opt/spark-tts
+    api_dir: "{{ project_dir }}/runtime/fastapi"
+  tags: ["api"]
+
+  tasks:
+    - name: 创建项目目录
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: 使用rsync同步项目文件
+      synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ project_dir }}"
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.conda"
+          - "--exclude=pretrained_models"
+          - "--exclude=example"
+          - "--exclude=node_modules"
+          - "--exclude=__pycache__"
+          - "--exclude=*.pyc"
+          - "--exclude=deploy"
+          - "--exclude=src"
+        delete: yes
+
+    - name: 构建并启动API容器
+      command: docker compose up -d --build
+      args:
+        chdir: "{{ api_dir }}"
+
+    - name: 检查API容器状态
+      command: docker compose ps
+      args:
+        chdir: "{{ api_dir }}"
+      register: api_status
+
+    - name: 显示API容器状态
+      debug:
+        var: api_status.stdout_lines
+
+    - name: api容器正常后移除同步目录
+      file:
+        path: "{{ project_dir }}"
+        state: absent
+      when: api_status.stdout_lines is search("api")
