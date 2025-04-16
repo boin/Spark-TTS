@@ -4,7 +4,7 @@ services:
       context: ../../
       dockerfile: runtime/fastapi/Dockerfile
     container_name: spark-api
-    image: spark-tts:latest
+    image: spark-api:latest
     ports:
       - "8000:8000"
     environment:
