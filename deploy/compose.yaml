@@ -14,7 +14,7 @@ services:
           devices:
             - driver: nvidia
               device_ids: [ "1" ]
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     ports:
       - 7862:7860
     tty: true
