@@ -52,8 +52,8 @@ case "$DEPLOY_TYPE" in
 esac
 
 # 执行ansible playbook
-echo -e "${YELLOW}执行命令: ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v${NC}"
-ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v
+ANSIBLE_STDOUT_CALLBACK=debug echo -e "${YELLOW}执行命令: ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v${NC}"
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v
 
 # 检查部署结果
 DEPLOY_RESULT=$?

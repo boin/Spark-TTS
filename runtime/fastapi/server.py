@@ -14,28 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import torch
-import logging
-import platform
-import soundfile as sf
+from contextlib import asynccontextmanager
 from io import BytesIO
+import logging
+import os
+import platform
+import tempfile
 from typing import Optional
 
-# 从SparkTTS导入必要的模块
-from cli.SparkTTS import SparkTTS
-from sparktts.utils.postprocess import loudnorm, eq
-
-# FastAPI相关导入
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
-from fastapi.responses import Response
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import uvicorn
-import tempfile
+from fastapi.responses import Response
+import soundfile as sf
 import soxr
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
+import torch
+import uvicorn
+
+from cli.SparkTTS import SparkTTS
+from sparktts.utils.postprocess import eq, loudnorm
 
 # 配置日志
 logging.basicConfig(
@@ -173,13 +169,24 @@ async def infer(
         # 处理提示语音
         temp_path = None
         try:
-            # 读取上传的音频文件
-            contents = await prompt_speech.read()
-            
-            # 使用临时文件
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                temp_path = temp_file.name
-                temp_file.write(contents)
+            # 读取上传的音频文件为二进制File字节序列
+            audio_bytes = await prompt_speech.read()
+
+            # 使用BytesIO处理二进制数据
+            with BytesIO(audio_bytes) as input_buffer:
+                # 读取音频数据和采样率
+                audio_data, sample_rate = sf.read(input_buffer)
+                
+                # 创建临时文件
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
+                    temp_path = temp_file.name
+                    
+                    # 如果采样率不是16kHz，则重采样
+                    if sample_rate != 16000:
+                        audio_data = soxr.resample(audio_data, sample_rate, 16000)
+                        
+                    # 直接写入临时文件，16位格式
+                    sf.write(temp_path, audio_data, 16000, subtype='PCM_16')
             
             # 执行语音克隆推理
             wav = run_voice_cloning(
