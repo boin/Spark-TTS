@@ -33,6 +33,8 @@ if [ ! -f "$INVENTORY_FILE" ]; then
     exit 1
 fi
 
+DEPLOY_FILE="spark-tts-deploy.yml"
+
 # 根据部署类型设置目标主机和标签
 case "$DEPLOY_TYPE" in
     "stage")
@@ -45,6 +47,11 @@ case "$DEPLOY_TYPE" in
         TAGS="api"
         echo -e "${GREEN}开始部署 Spark-TTS API 服务器到 $TARGET_HOST${NC}"
         ;;
+    "swarm")
+        TAGS="swarm"
+        DEPLOY_FILE="spark-tts-swarm.yml"
+        echo -e "${GREEN}开始部署 Spark-TTS API 服务器到 $TAGS${NC}"
+        ;;
     *)
         echo -e "${RED}错误: 无效的部署类型 '$DEPLOY_TYPE'。请使用 'stage' 或 'api'${NC}"
         exit 1
@@ -52,8 +59,12 @@ case "$DEPLOY_TYPE" in
 esac
 
 # 执行ansible playbook
-ANSIBLE_STDOUT_CALLBACK=debug echo -e "${YELLOW}执行命令: ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v${NC}"
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $INVENTORY_FILE ./deploy/spark-tts-deploy.yml -l $TARGET_HOST --tags $TAGS -v
+CMD="ansible-playbook -i $INVENTORY_FILE ./deploy/$DEPLOY_FILE -l $TARGET_HOST --tags $TAGS -v"
+if [ "$DEPLOY_TYPE" == "swarm" ]; then
+    CMD="ansible-playbook -i $INVENTORY_FILE ./deploy/$DEPLOY_FILE --tags $TAGS -v"
+fi
+echo -e "${YELLOW}执行命令: $CMD${NC}"
+ANSIBLE_STDOUT_CALLBACK=debug $CMD
 
 # 检查部署结果
 DEPLOY_RESULT=$?

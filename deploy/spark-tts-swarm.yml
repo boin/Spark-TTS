@@ -1,0 +1,35 @@
+- name: 部署 Spark-TTS API Swarm 服务
+  hosts: localhost
+  gather_facts: true
+  vars: &deploy_vars
+    project_name: "spark-tts"
+    project_path: "{{ playbook_dir }}/.."
+    compose_file_path: "{{ project_path }}/runtime/fastapi/docker-stack.yml"
+    dockerfile_path: "{{ project_path }}/runtime/fastapi/Dockerfile"
+    image_tag: "latest"
+    deploy_dir: "/opt/{{ project_name }}"
+    image_name: "api"
+    # rsync配置
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=.conda"
+      - "--exclude=pretrained_models"
+      - "--exclude=example"
+      - "--exclude=node_modules"
+      - "--exclude=__pycache__"
+      - "--exclude=*.pyc"
+      - "--exclude=deploy"
+      - "--exclude=src"
+
+  roles:
+    - role: /workspace/z/ansible/roles/docker_ci_cd
+      vars:
+        # CI相关变量
+        ci_project_name: "{{ project_name }}"
+        ci_project_path: "{{ project_path }}"
+        ci_dockerfile_path: "{{ dockerfile_path }}"
+        ci_image_name: "{{ image_name }}"
+        ci_image_tag: "{{ image_tag }}"
+        ci_compose_file_path: "{{ compose_file_path }}"
+        ci_rsync_opts: "{{ rsync_opts }}"
+      tags: [swarm, ci, cd]
