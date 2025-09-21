@@ -21,13 +21,15 @@ RUN --mount=type=bind,source=requirements.txt,target=/tmp/requirements.txt \
     pip install -r /tmp/requirements.txt \
     && pip install fastapi uvicorn python-multipart pyloudnorm
 
+RUN pip install --no-cache-dir fastapi-cuda-health --extra-index-url http://pypi-server/simple/ --trusted-host pypi-server
+
 WORKDIR /app
 COPY runtime/fastapi/server.py /app/
 COPY cli /app/cli
 COPY sparktts /app/sparktts
 
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=2m --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["python", "server.py"]

@@ -53,7 +53,7 @@ case "$DEPLOY_TYPE" in
         echo -e "${GREEN}开始部署 Spark-TTS API 服务器到 $TAGS${NC}"
         ;;
     *)
-        echo -e "${RED}错误: 无效的部署类型 '$DEPLOY_TYPE'。请使用 'stage' 或 'api'${NC}"
+        echo -e "${RED}错误: 无效的部署类型 '$DEPLOY_TYPE'。请使用 'stage' , 'api' 或 'swarm'${NC}"
         exit 1
         ;;
 esac

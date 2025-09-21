@@ -18,13 +18,16 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 import logging
 import os
+from pathlib import Path
 import platform
+import sys
 import tempfile
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi_cuda_health import setup_cuda_health
 import soundfile as sf
 import soxr
 import torch
@@ -33,17 +36,16 @@ import uvicorn
 from cli.SparkTTS import SparkTTS
 from sparktts.utils.postprocess import eq, loudnorm
 
+sys.path.append(str(Path(os.path.dirname(__file__)).parent.parent))
+
+
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("spark-api")
-
-# 过滤健康检查和文档页面的日志
-logging.getLogger("uvicorn.access").addFilter(
-    lambda r: "/health" not in r.getMessage() and "/docs" not in r.getMessage()
-)
 
 # 全局模型实例
 model = None
@@ -66,13 +68,19 @@ def initialize_model(model_dir="pretrained_models/Spark-TTS-0.5B", device=0):
         device = torch.device("cpu")
         logger.info("GPU加速不可用，使用CPU")
 
-    return SparkTTS(model_dir, device)
+    return SparkTTS(Path(model_dir), device)
 
 def run_voice_cloning(
     text,
     model,
     prompt_speech,
     prompt_text=None,
+    gender=None,
+    pitch=None,
+    speed=None,
+    temperature=0.8,
+    top_k=50,
+    top_p=0.95,
 ):
     """执行语音克隆推理并返回音频数据"""
     logger.info("开始语音克隆推理...")
@@ -87,9 +95,12 @@ def run_voice_cloning(
                 text,
                 prompt_speech,
                 prompt_text,
-                gender=None,
-                pitch=None,
-                speed=None,
+                gender=gender,
+                pitch=pitch,
+                speed=speed,
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
             )
             logger.info("推理完成")
             return wav
@@ -129,24 +140,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+setup_cuda_health(app, ready_predicate=lambda: model is not None)
+
 @app.get("/")
 async def root():
     """API根路径"""
     return {"message": "欢迎使用Spark-TTS API服务"}
 
-@app.get("/health")
-async def health_check():
-    """健康检查端点"""
-    if model is None:
-        raise HTTPException(status_code=503, detail="模型未初始化")
-    return {"status": "healthy"}
-
 @app.post("/api/infer")
 async def infer(
     text: str = Form(...),
-    prompt_text: Optional[str] = Form(None),
+    prompt_text: Optional[str]=Form(None),
     prompt_speech: UploadFile = File(...),
-    postprocess: Optional[bool] = Form(True)
+    gender:Optional[Literal["male", "female"]] = Form(None),
+    pitch:Optional[Literal["very_low", "low", "moderate", "high", "very_high"]] = Form("moderate"),
+    speed:Optional[Literal["very_low", "low", "moderate", "high", "very_high"]] = Form("moderate"),
+    temperature:Optional[float] = Form(0.8),
+    top_k:Optional[int] = Form(50),
+    top_p:Optional[float] = Form(0.95),
+    postprocess: Optional[bool] = Form(True),
 ):
     """
     语音克隆API
@@ -194,6 +206,12 @@ async def infer(
                 model=model,
                 prompt_speech=temp_path,
                 prompt_text=prompt_text,
+                gender=gender,
+                pitch=pitch,
+                speed=speed,
+                temperature=temperature or 0.8,
+                top_k=top_k or 50,
+                top_p=top_p or 0.95,
             )
                     
             # 后处理
@@ -211,6 +229,7 @@ async def infer(
 
             # 返回二进制音频数据
             return Response(
+                headers={"Content-Disposition": "attachment; filename=generated.wav"},
                 content=buffer.read(),
                 media_type="audio/wav"
             )
