@@ -20,6 +20,7 @@
       - "--exclude=*.pyc"
       - "--exclude=deploy"
       - "--exclude=src"
+      - "--exclude=runtime/*/docker-*.yml"
 
   roles:
     - role: /workspace/z/ansible/roles/docker_ci_cd

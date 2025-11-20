@@ -24,38 +24,38 @@ services:
       labels:
         caddy: http://spark-api
         # 汇总多个独立 Swarm Service 端点
-        caddy.reverse_proxy: spark-tts_api-1:8000 spark-tts_api-2:8000
+        caddy.reverse_proxy: spark-tts_api-1:8000 #spark-tts_api-2:8000
         # 主动健康检查
         caddy.reverse_proxy.health_uri: /health
         caddy.reverse_proxy.health_interval: 15s
         caddy.reverse_proxy.health_timeout: 2s
         # 请求内部快速重试
-        caddy.reverse_proxy.lb_try_duration: 5s
-        caddy.reverse_proxy.lb_try_interval: 250ms
+        # caddy.reverse_proxy.lb_try_duration: 5s
+        # caddy.reverse_proxy.lb_try_interval: 250ms
         # （可选扩展示例——如需再开启）
         # caddy.reverse_proxy.transport.response_header_timeout: 60s
         # caddy.reverse_proxy.transport.dial_timeout: 5s
 
-  api-2:
-    image: ${REGISTRY_URL:-registry:5000}/spark-tts/api:${IMAGE_TAG:-latest}
-    environment:
-      - MODEL_DIR=/app/pretrained_models/Spark-TTS-0.5B
-      - NVIDIA_VISIBLE_DEVICES=1
-      - TZ=Asia/Shanghai
-    volumes:
-      - /TTD-Data/spark-tts/pretrained_models:/app/pretrained_models
-    networks:
-      - caddy
-    deploy:
-      mode: replicated
-      endpoint_mode: dnsrr
-      replicas: 1
-      placement:
-        constraints:
-          - node.hostname == ttd-edge
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
+  # api-2:
+  #   image: ${REGISTRY_URL:-registry:5000}/spark-tts/api:${IMAGE_TAG:-latest}
+  #   environment:
+  #     - MODEL_DIR=/app/pretrained_models/Spark-TTS-0.5B
+  #     - NVIDIA_VISIBLE_DEVICES=1
+  #     - TZ=Asia/Shanghai
+  #   volumes:
+  #     - /TTD-Data/spark-tts/pretrained_models:/app/pretrained_models
+  #   networks:
+  #     - caddy
+  #   deploy:
+  #     mode: replicated
+  #     endpoint_mode: dnsrr
+  #     replicas: 1
+  #     placement:
+  #       constraints:
+  #         - node.hostname == ttd-edge
+  #     restart_policy:
+  #       condition: on-failure
+  #       max_attempts: 3
 
 networks:
   caddy:
