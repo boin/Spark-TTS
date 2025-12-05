@@ -19,7 +19,7 @@ services:
         constraints:
           - node.hostname == ttd-edge
       restart_policy:
-        condition: on-failure
+        condition: any
         max_attempts: 3
       labels:
         caddy: http://spark-api
@@ -54,7 +54,7 @@ services:
   #       constraints:
   #         - node.hostname == ttd-edge
   #     restart_policy:
-  #       condition: on-failure
+  #       condition: any
   #       max_attempts: 3
 
 networks:
