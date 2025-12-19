@@ -27,14 +27,13 @@ from typing import Literal, Optional
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from fastapi_cuda_health import setup_cuda_health
+from ttd_fastapi_utils import setup_cuda_health, apply_postprocess
 import soundfile as sf
 import soxr
 import torch
 import uvicorn
 
 from cli.SparkTTS import SparkTTS
-from sparktts.utils.postprocess import eq, loudnorm
 
 sys.path.append(str(Path(os.path.dirname(__file__)).parent.parent))
 
@@ -142,11 +141,6 @@ app.add_middleware(
 
 setup_cuda_health(app, ready_predicate=lambda: model is not None)
 
-@app.get("/")
-async def root():
-    """API根路径"""
-    return {"message": "欢迎使用Spark-TTS API服务"}
-
 @app.post("/api/infer")
 async def infer(
     text: str = Form(...),
@@ -216,8 +210,9 @@ async def infer(
                     
             # 后处理
             if postprocess:
-                wav, _ = loudnorm(wav, 16000)
-                wav = eq(wav, 16000)
+                # wav, _ = loudnorm(wav, 16000)
+                # wav = eq(wav, 16000)
+                wav = apply_postprocess(wav, 16000)
             
             # 超采样至48kHz
             wav = soxr.resample(wav, 16000, 48000)
@@ -245,7 +240,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8000"))
     logger.info(f"启动服务器: {port}")
     uvicorn.run(
-        "server:app",
+        app,
         host="0.0.0.0",
         port=port,
         reload=False
