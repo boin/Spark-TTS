@@ -17,7 +17,7 @@ services:
       replicas: 1
       placement:
         constraints:
-          - node.hostname == ttd-edge
+          - node.hostname == ttd-stage
       restart_policy:
         condition: any
         max_attempts: 3
