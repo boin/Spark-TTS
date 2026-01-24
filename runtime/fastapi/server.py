@@ -27,7 +27,7 @@ from typing import Literal, Optional
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from ttd_fastapi_utils import setup_cuda_health, apply_postprocess
+from ttd_fastapi_utils import setup_cuda_health, apply_postprocess, SmartModel
 import soundfile as sf
 import soxr
 import torch
@@ -46,11 +46,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("spark-api")
 
-# 全局模型实例
-model = None
+# 全局模型实例管理器
+model_manager = None
 
-def initialize_model(model_dir="pretrained_models/Spark-TTS-0.5B", device=0):
-    """加载模型"""
+def load_model_func():
+    """加载模型的实际函数"""
+    model_dir = os.environ.get("MODEL_DIR", "pretrained_models/Spark-TTS-0.5B")
+    device = int(os.environ.get("DEVICE", "0"))
+    
     logger.info(f"正在加载模型: {model_dir}")
 
     # 根据平台和可用性确定适当的设备
@@ -71,7 +74,7 @@ def initialize_model(model_dir="pretrained_models/Spark-TTS-0.5B", device=0):
 
 def run_voice_cloning(
     text,
-    model,
+    model_mgr,
     prompt_speech,
     prompt_text=None,
     gender=None,
@@ -83,6 +86,9 @@ def run_voice_cloning(
 ):
     """执行语音克隆推理并返回音频数据"""
     logger.info("开始语音克隆推理...")
+    
+    # 获取实际模型实例（如果未加载则自动加载）
+    model = model_mgr.get()
 
     if prompt_text is not None:
         prompt_text = None if len(prompt_text) <= 1 else prompt_text
@@ -112,15 +118,16 @@ def run_voice_cloning(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时执行
-    global model
-    model_dir = os.environ.get("MODEL_DIR", "pretrained_models/Spark-TTS-0.5B")
-    device = int(os.environ.get("DEVICE", "0"))
-    logger.info("正在初始化Spark-TTS模型...")
-    model = initialize_model(model_dir=model_dir, device=device)
-    logger.info("Spark-TTS模型初始化完成")
+    global model_manager
+    logger.info("正在初始化Spark-TTS模型管理器...")
+    # 使用SmartModel包装，默认2小时（7200秒）自动卸载
+    model_manager = SmartModel(load_model_func, timeout_seconds=7200)
+    logger.info("Spark-TTS模型管理器初始化完成")
     yield
     # 关闭时执行
     logger.info("关闭应用...")
+    if model_manager:
+        model_manager.stop()
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -139,7 +146,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-setup_cuda_health(app, ready_predicate=lambda: model is not None)
+setup_cuda_health(app, ready_predicate=lambda: model_manager is not None)
 
 @app.post("/api/infer")
 async def infer(
@@ -168,7 +175,7 @@ async def infer(
     返回：
         二进制WAV格式音频数据
     """
-    if model is None:
+    if model_manager is None:
         raise HTTPException(status_code=503, detail="模型未初始化")
     
     try:
@@ -197,7 +204,7 @@ async def infer(
             # 执行语音克隆推理
             wav = run_voice_cloning(
                 text=text,
-                model=model,
+                model_mgr=model_manager,
                 prompt_speech=temp_path,
                 prompt_text=prompt_text,
                 gender=gender,

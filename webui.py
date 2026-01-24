@@ -24,33 +24,37 @@ import platform
 from datetime import datetime
 from cli.SparkTTS import SparkTTS
 from sparktts.utils.token_parser import LEVELS_MAP_UI
+from ttd_fastapi_utils import SmartModel
 
 
 def initialize_model(model_dir="pretrained_models/Spark-TTS-0.5B", device=0):
-    """Load the model once at the beginning."""
-    logging.info(f"Loading model from: {model_dir}")
+    """Load the model manager with auto-unload capability."""
+    
+    def loader():
+        logging.info(f"Loading model from: {model_dir}")
+        # Determine appropriate device based on platform and availability
+        if platform.system() == "Darwin":
+            # macOS with MPS support (Apple Silicon)
+            dev = torch.device(f"mps:{device}")
+            logging.info(f"Using MPS device: {dev}")
+        elif torch.cuda.is_available():
+            # System with CUDA support
+            dev = torch.device(f"cuda:{device}")
+            logging.info(f"Using CUDA device: {dev}")
+        else:
+            # Fall back to CPU
+            dev = torch.device("cpu")
+            logging.info("GPU acceleration not available, using CPU")
 
-    # Determine appropriate device based on platform and availability
-    if platform.system() == "Darwin":
-        # macOS with MPS support (Apple Silicon)
-        device = torch.device(f"mps:{device}")
-        logging.info(f"Using MPS device: {device}")
-    elif torch.cuda.is_available():
-        # System with CUDA support
-        device = torch.device(f"cuda:{device}")
-        logging.info(f"Using CUDA device: {device}")
-    else:
-        # Fall back to CPU
-        device = torch.device("cpu")
-        logging.info("GPU acceleration not available, using CPU")
+        return SparkTTS(model_dir, dev)
 
-    model = SparkTTS(model_dir, device)
-    return model
+    # Wrap with SmartModel, default timeout 2h (7200s)
+    return SmartModel(loader, timeout_seconds=7200)
 
 
 def run_tts(
     text,
-    model,
+    model_manager,
     prompt_text=None,
     prompt_speech=None,
     gender=None,
@@ -72,6 +76,9 @@ def run_tts(
     save_path = os.path.join(save_dir, f"{timestamp}.wav")
 
     logging.info("Starting inference...")
+
+    # Get the actual model instance (will load if needed)
+    model = model_manager.get()
 
     # Perform inference and save the output audio
     with torch.no_grad():

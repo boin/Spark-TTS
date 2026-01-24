@@ -21,7 +21,7 @@ RUN --mount=type=bind,source=requirements.txt,target=/tmp/requirements.txt \
     pip install -r /tmp/requirements.txt \
     && pip install fastapi uvicorn python-multipart pyloudnorm
 
-RUN pip install --no-cache-dir ttd_fastapi_utils>=0.2.2 --extra-index-url http://pypi-server/simple/ --trusted-host pypi-server
+RUN pip install --no-cache-dir "ttd_fastapi_utils>=0.2.4" --extra-index-url http://pypi-server/simple/ --trusted-host pypi-server
 
 WORKDIR /app
 COPY runtime/fastapi/server.py /app/
